@@ -18,14 +18,14 @@ type branch struct {
 }
 
 func branchAction(ctx *cli.Context) error {
-	user := ctx.String("name")
-	if len(user) == 0 {
+	name := ctx.String("name")
+	if len(name) == 0 {
 		return fmt.Errorf("branch name required")
 	}
 
 	dir := ctx.String("dir")
 
-	err := branchRun(user, dir)
+	err := branchRun(name, dir)
 	if err != nil {
 		return err
 	}
@@ -55,8 +55,8 @@ func branchFlags() []cli.Flag {
 	}
 }
 
-func branchRun(user string, dir string) error {
-	branches, err := getGitBranches(dir, user)
+func branchRun(name string, dir string) error {
+	branches, err := getGitBranches(dir, name)
 	if err != nil {
 		return fmt.Errorf("error when getGitBranches: %w", err)
 	}
