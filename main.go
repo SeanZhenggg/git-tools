@@ -37,20 +37,23 @@ func flags(app *cli.App) {
 	}
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
-			Name:  "user, u",
-			Value: "",
-			Usage: "git user name",
+			Name:    "user",
+			Aliases: []string{"u"},
+			Value:   "",
+			Usage:   "git user name",
 		},
 		&cli.StringFlag{
-			Name:  "dir, d",
-			Value: root,
-			Usage: "parent directory to start recursively searching for *.git files",
+			Name:    "dir",
+			Aliases: []string{"d"},
+			Value:   root,
+			Usage:   "parent directory to start recursively searching for *.git files",
 		},
 		&cli.TimestampFlag{
-			Name:   "after, a",
-			Layout: time.DateOnly,
-			Value:  cli.NewTimestamp(time.Now().Add(-24 * time.Hour)),
-			Usage:  "when to start looking at commit history",
+			Name:    "after",
+			Aliases: []string{"a"},
+			Layout:  time.DateOnly,
+			Value:   cli.NewTimestamp(time.Now().Add(-24 * time.Hour)),
+			Usage:   "when to start looking at commit history",
 		},
 	}
 }
