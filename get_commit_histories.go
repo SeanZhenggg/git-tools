@@ -89,9 +89,16 @@ func run(user string, dir string, afterDate *time.Time) error {
 		return fmt.Errorf("error when json.MarshalIndent: %w", err)
 	}
 
-	err = os.WriteFile("history.json", indent, 0776)
+	pager := exec.Command("less")
+
+	buffer := bytes.NewBuffer(indent)
+	pager.Stderr = os.Stderr
+	pager.Stdin = buffer
+	pager.Stdout = os.Stdout
+
+	err = pager.Run()
 	if err != nil {
-		return fmt.Errorf("error when write history.json: %w", err)
+		return fmt.Errorf("error when less command execute: %w", err)
 	}
 	return nil
 }

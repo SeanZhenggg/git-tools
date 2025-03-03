@@ -70,7 +70,18 @@ func branchRun(name string, dir string) error {
 		builder.WriteString("\n")
 	}
 
-	fmt.Print(builder.String())
+	reader := strings.NewReader(builder.String())
+
+	pager := exec.Command("less")
+
+	pager.Stdin = reader
+	pager.Stderr = os.Stderr
+	pager.Stdout = os.Stdout
+
+	err = pager.Run()
+	if err != nil {
+		return fmt.Errorf("error when less command execute: %w", err)
+	}
 
 	return nil
 }
