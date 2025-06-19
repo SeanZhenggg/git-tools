@@ -16,6 +16,7 @@ import (
 )
 
 type commit struct {
+	Commit  string    `xml:"commit"`
 	Author  string    `xml:"author"`
 	Project string    `xml:"project"`
 	Date    time.Time `xml:"date"`
@@ -135,7 +136,8 @@ func getGitHistory(dir, user string, after time.Time) ([]commit, error) {
 					}
 					return err
 				}
-
+				ch := []rune(c.Commit)
+				c.Commit = string(ch[0:6])
 				c.Project = getParentDir(path)
 				commits = append(commits, c)
 			}
@@ -150,6 +152,7 @@ func getGitHistory(dir, user string, after time.Time) ([]commit, error) {
 
 func getCommits(path, user, after string) ([]byte, error) {
 	format := `<entry>
+				<commit>%H</commit>
 				<author>%an</author>
 				<date>%cI</date>
 				<message>%B</message>
