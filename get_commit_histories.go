@@ -2,21 +2,23 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"encoding/xml"
 	"fmt"
-	"github.com/mitchellh/go-homedir"
-	"github.com/urfave/cli/v2"
 	"io"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
+	"strings"
 	"time"
+
+	"github.com/mitchellh/go-homedir"
+	"github.com/urfave/cli/v2"
 )
 
 type commit struct {
-	Commit  string    `xml:"commit"`
+	Hash    string    `xml:"commit"`
 	Author  string    `xml:"author"`
 	Project string    `xml:"project"`
 	Date    time.Time `xml:"date"`
@@ -42,7 +44,9 @@ func logHistoryAction(ctx *cli.Context) error {
 	dir := ctx.String("dir")
 	afterDate := ctx.Timestamp("after")
 
-	err := run(user, dir, afterDate)
+	beforeDate := ctx.Timestamp("before")
+
+	err := run(user, dir, afterDate, beforeDate)
 	if err != nil {
 		return err
 	}
@@ -55,6 +59,8 @@ func logHistoryFlags() []cli.Flag {
 	if err != nil {
 		panic(err)
 	}
+
+	now := time.Now()
 
 	return []cli.Flag{
 		&cli.StringFlag{
@@ -72,27 +78,35 @@ func logHistoryFlags() []cli.Flag {
 		&cli.TimestampFlag{
 			Name:    "after",
 			Aliases: []string{"a"},
-			Layout:  time.DateOnly,
-			Value:   cli.NewTimestamp(time.Now().Add(-24 * time.Hour)),
-			Usage:   "when to start looking at commit history",
+			Layout:  "2006-01-02T15:04:05",
+			Value:   cli.NewTimestamp(time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)),
+			Usage:   "after specific datetime",
+		},
+		&cli.TimestampFlag{
+			Name:    "before",
+			Aliases: []string{"b"},
+			Layout:  "2006-01-02T15:04:05",
+			Value:   cli.NewTimestamp(time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 0, time.Local)),
+			Usage:   "before specific datetime",
 		},
 	}
 }
 
-func run(user string, dir string, afterDate *time.Time) error {
-	history, err := getGitHistory(dir, user, *afterDate)
+func run(user string, dir string, after *time.Time, before *time.Time) error {
+	history, err := getGitHistory(dir, user, *after, *before)
 	if err != nil {
 		return fmt.Errorf("error when getGitHistory: %w", err)
 	}
 
-	indent, err := json.MarshalIndent(history, "", "  ")
-	if err != nil {
-		return fmt.Errorf("error when json.MarshalIndent: %w", err)
-	}
+	// indent, err := json.MarshalIndent(history, "", "  ")
+	// if err != nil {
+	// return fmt.Errorf("error when json.MarshalIndent: %w", err)
+	// }
+	output := formatHistoryOutput(history)
 
 	pager := exec.Command("less")
 
-	buffer := bytes.NewBuffer(indent)
+	buffer := bytes.NewBuffer(output)
 	pager.Stderr = os.Stderr
 	pager.Stdin = buffer
 	pager.Stdout = os.Stdout
@@ -104,7 +118,7 @@ func run(user string, dir string, afterDate *time.Time) error {
 	return nil
 }
 
-func getGitHistory(dir, user string, after time.Time) ([]commit, error) {
+func getGitHistory(dir, user string, after time.Time, before time.Time) ([]commit, error) {
 	var commits []commit
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -112,7 +126,7 @@ func getGitHistory(dir, user string, after time.Time) ([]commit, error) {
 		}
 
 		if info.Name() == ".git" {
-			b, err := getCommits(path, user, after.Format(time.DateTime))
+			b, err := getCommits(path, user, after.Format(time.DateTime), before.Format(time.DateTime))
 			if err != nil {
 				return err
 			}
@@ -123,7 +137,7 @@ func getGitHistory(dir, user string, after time.Time) ([]commit, error) {
 			}
 
 			// https://stackoverflow.com/questions/27553274/unmarshal-xml-array-in-golang-only-getting-the-first-element
-			//https://yourbasic.org/golang/list-files-in-directory/
+			// https://yourbasic.org/golang/list-files-in-directory/
 			d := xml.NewDecoder(bytes.NewBuffer(b))
 			d.Strict = false // for now
 
@@ -136,8 +150,8 @@ func getGitHistory(dir, user string, after time.Time) ([]commit, error) {
 					}
 					return err
 				}
-				ch := []rune(c.Commit)
-				c.Commit = string(ch[0:6])
+				ch := []rune(c.Hash)
+				c.Hash = string(ch[0:6])
 				c.Project = getParentDir(path)
 				commits = append(commits, c)
 			}
@@ -150,14 +164,14 @@ func getGitHistory(dir, user string, after time.Time) ([]commit, error) {
 	return commits, err
 }
 
-func getCommits(path, user, after string) ([]byte, error) {
+func getCommits(path, user, after string, before string) ([]byte, error) {
 	format := `<entry>
 				<commit>%H</commit>
 				<author>%an</author>
 				<date>%cI</date>
 				<message>%B</message>
 				</entry>`
-	cmd := exec.Command("git", "log", "--author="+user, "--pretty=format:"+format, "--after="+after)
+	cmd := exec.Command("git", "log", "--author="+user, "--pretty=format:"+format, "--after="+after, "--before="+before)
 	cmd.Dir = path
 	out, err := cmd.Output()
 	if err != nil {
@@ -165,4 +179,26 @@ func getCommits(path, user, after string) ([]byte, error) {
 	}
 
 	return out, nil
+}
+
+func formatHistoryOutput(commits []commit) []byte {
+	slices.SortFunc(commits, func(a commit, b commit) int {
+		return int(b.Date.Unix()) - int(a.Date.Unix())
+	})
+
+	builder := strings.Builder{}
+
+	var currentDate string
+	for _, commit := range commits {
+		nextDate := commit.Date.Format(time.DateOnly)
+		if currentDate == "" || currentDate != nextDate {
+			if currentDate != "" {
+				builder.WriteString("\n")
+			}
+			builder.WriteString(fmt.Sprintf("[Date: %s]\n", nextDate))
+			currentDate = nextDate
+		}
+		builder.WriteString(fmt.Sprintf("\t[%4s][%6s][%s]: %s", commit.Date.Format("15:04"), commit.Hash, commit.Author, commit.Message))
+	}
+	return []byte(builder.String())
 }
