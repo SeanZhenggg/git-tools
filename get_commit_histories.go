@@ -171,7 +171,7 @@ func getCommits(path, user, after string, before string) ([]byte, error) {
 				<date>%cI</date>
 				<message>%B</message>
 				</entry>`
-	cmd := exec.Command("git", "log", "--author="+user, "--pretty=format:"+format, "--after="+after, "--before="+before)
+	cmd := exec.Command("git", "log", "--all", "--author="+user, "--pretty=format:"+format, "--after="+after, "--before="+before)
 	cmd.Dir = path
 	out, err := cmd.Output()
 	if err != nil {
@@ -198,7 +198,8 @@ func formatHistoryOutput(commits []commit) []byte {
 			builder.WriteString(fmt.Sprintf("[Date: %s]\n", nextDate))
 			currentDate = nextDate
 		}
-		builder.WriteString(fmt.Sprintf("\t[%4s][%6s][%s]: %s", commit.Date.Format("15:04"), commit.Hash, commit.Author, commit.Message))
+		// builder.WriteString(fmt.Sprintf("\t[%4s][%6s][%s]: %s", commit.Date.Format("15:04"), commit.Hash, commit.Author, commit.Message))
+		builder.WriteString(fmt.Sprintf("\t[%4s][%6s]: %s", commit.Date.Format("15:04"), commit.Hash, commit.Message))
 	}
 	return []byte(builder.String())
 }
