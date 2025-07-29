@@ -168,7 +168,7 @@ func getCommits(path, user, after string, before string) ([]byte, error) {
 	format := `<entry>
 				<commit>%H</commit>
 				<author>%an</author>
-				<date>%cI</date>
+				<date>%aI</date>
 				<message>%B</message>
 				</entry>`
 	cmd := exec.Command("git", "log", "--all", "--author="+user, "--pretty=format:"+format, "--after="+after, "--before="+before)
