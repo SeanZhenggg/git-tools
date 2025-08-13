@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
+	"html"
 	"io"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -136,6 +138,7 @@ func getGitHistory(dir, user string, after time.Time, before time.Time) ([]commi
 				return nil
 			}
 
+			b = preprocessXMLContent(b)
 			// https://stackoverflow.com/questions/27553274/unmarshal-xml-array-in-golang-only-getting-the-first-element
 			// https://yourbasic.org/golang/list-files-in-directory/
 			d := xml.NewDecoder(bytes.NewBuffer(b))
@@ -199,7 +202,27 @@ func formatHistoryOutput(commits []commit) []byte {
 			currentDate = nextDate
 		}
 		// builder.WriteString(fmt.Sprintf("\t[%4s][%6s][%s]: %s", commit.Date.Format("15:04"), commit.Hash, commit.Author, commit.Message))
-		builder.WriteString(fmt.Sprintf("\t[%4s][%6s] %s", commit.Date.Format("15:04"), commit.Hash, commit.Message))
+		builder.WriteString(fmt.Sprintf("\t[%4s][%6s] %s\n", commit.Date.Format("15:04"), commit.Hash, commit.Message))
 	}
 	return []byte(builder.String())
+}
+
+func preprocessXMLContent(xmlData []byte) []byte {
+	// 匹配任何 XML 標籤：捕獲標籤名稱並確保開始和結束標籤一致
+	pattern := `(<([a-zA-Z][a-zA-Z0-9_-]*)[^>]*>)(.*?)\n?(<\/([a-zA-Z0-9_-]*)>)`
+	re := regexp.MustCompile(pattern)
+
+	return re.ReplaceAllFunc(xmlData, func(match []byte) []byte {
+		parts := re.FindSubmatch(match)
+		if len(parts) == 6 {
+			openTag := parts[1] // <tagName attr="value">
+			// tagName := parts[2] // tagName
+			content := parts[3]  // 內容
+			closeTag := parts[4] // </tagName>
+			// tagName := parts[5] // tagName
+			escapedContent := html.EscapeString(string(content))
+			return bytes.Join([][]byte{openTag, []byte(escapedContent), closeTag}, []byte{})
+		}
+		return match
+	})
 }
