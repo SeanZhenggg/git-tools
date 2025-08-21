@@ -198,11 +198,11 @@ func formatHistoryOutput(commits []commit) []byte {
 			if currentDate != "" {
 				builder.WriteString("\n")
 			}
-			builder.WriteString(fmt.Sprintf("[Date: %s]\n", nextDate))
+			builder.WriteString(fmt.Sprintf("\033[93m\033[1m[Date: %s]\n\033[0m", nextDate))
 			currentDate = nextDate
 		}
 		// builder.WriteString(fmt.Sprintf("\t[%4s][%6s][%s]: %s", commit.Date.Format("15:04"), commit.Hash, commit.Author, commit.Message))
-		builder.WriteString(fmt.Sprintf("\t[%4s][%6s] %s\n", commit.Date.Format("15:04"), commit.Hash, commit.Message))
+		builder.WriteString(fmt.Sprintf("[%4s][%6s] %s\n", commit.Date.Format("15:04"), commit.Hash, commit.Message))
 	}
 	return []byte(builder.String())
 }
