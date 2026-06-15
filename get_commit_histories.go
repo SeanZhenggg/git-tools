@@ -127,7 +127,7 @@ func getGitHistory(dir, user string, after time.Time, before time.Time) ([]commi
 			return err
 		}
 
-		if info.Name() == ".git" {
+		if info.Name() == ".git" && info.IsDir() {
 			b, err := getCommits(path, user, after.Format(time.DateTime), before.Format(time.DateTime))
 			if err != nil {
 				return err
@@ -208,21 +208,10 @@ func formatHistoryOutput(commits []commit) []byte {
 }
 
 func preprocessXMLContent(xmlData []byte) []byte {
-	// 匹配任何 XML 標籤：捕獲標籤名稱並確保開始和結束標籤一致
-	pattern := `(<([a-zA-Z][a-zA-Z0-9_-]*)[^>]*>)(.*?)\n?(<\/([a-zA-Z0-9_-]*)>)`
-	re := regexp.MustCompile(pattern)
-
+	re := regexp.MustCompile(`(?s)<message>(.*?)</message>`)
 	return re.ReplaceAllFunc(xmlData, func(match []byte) []byte {
-		parts := re.FindSubmatch(match)
-		if len(parts) == 6 {
-			openTag := parts[1] // <tagName attr="value">
-			// tagName := parts[2] // tagName
-			content := parts[3]  // 內容
-			closeTag := parts[4] // </tagName>
-			// tagName := parts[5] // tagName
-			escapedContent := html.EscapeString(string(content))
-			return bytes.Join([][]byte{openTag, []byte(escapedContent), closeTag}, []byte{})
-		}
-		return match
+		content := match[9 : len(match)-10] // strip <message> and </message>
+		escaped := html.EscapeString(string(content))
+		return append(append([]byte("<message>"), escaped...), []byte("</message>")...)
 	})
 }
